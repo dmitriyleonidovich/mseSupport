@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Check MediaSource Codecs Support</title>
+    <style>
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table,
+      th,
+      td {
+        border: 1px solid black;
+      }
+
+      th,
+      td {
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        background-color: #f2f2f2;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.10/clipboard.min.js"></script>
+  </head>
+  <body>
+    <h1>Check MediaSource Codecs Support</h1>
+    <button class="copy-button">Copy Results to Clipboard</button>
+
+    <div class="input-area">
+      <h2>Paste Results Here</h2>
+      <textarea id="input-results" rows="10" cols="100"></textarea>
+      <br />
+      <button class="apply-button">Apply Results</button>
+    </div>
+
+    <h2>Results from Worker</h2>
+    <table id="results-worker-thread">
+      <tr>
+        <th>Category</th>
+        <th>Mime Type</th>
+        <th>Codecs</th>
+        <th>Supported</th>
+      </tr>
+    </table>
+
+    <h2>Results from Main Thread</h2>
+    <table id="results-main-thread">
+      <tr>
+        <th>Category</th>
+        <th>Mime Type</th>
+        <th>Codecs</th>
+        <th>Supported</th>
+      </tr>
+    </table>
+
+    <h2 id="worker-support"></h2>
+    <script>
+      const mse =
+        window.ManagedMediaSource ||
+        window.MediaSource ||
+        window.WebKitMediaSource;
+      // Массивы с MIME типами и кодеками для проверки
+      const codecRepresentations = {
+        H264: [
+          { mimeType: "video/mp4", codecs: "avc1.640828" }, // H264
+          { mimeType: "video/mp4", codecs: "avc1.64081F" }, // H264
+          { mimeType: "video/mp4", codecs: "avc1.4D481E" }, // H264
+          { mimeType: "video/mp4", codecs: "avc1.42E01E" },
+          { mimeType: "video/mp4", codecs: "avc3.42E01E" },
+          { mimeType: "video/mp2t", codecs: "avc1.42E01E" },
+          { mimeType: "video/mp2t", codecs: "avc3.42E01E" },
+        ],
+        H265: [
+          { mimeType: "video/mp4", codecs: "hev1.1.6.L93.B0" }, // H265
+          { mimeType: "video/mp4", codecs: "hvc1.2.4.L120.B0" }, // H265
+          { mimeType: "video/mp4", codecs: "hev1.1.6.L93.90" },
+          { mimeType: "video/mp4", codecs: "hvc1.1.6.L93.90" },
+          {
+            mimeType: "video/mp4",
+            codecs: "hev1.2.4.L153.B0",
+            eotf: "smpte2084",
+          },
+          {
+            mimeType: "video/mp4",
+            codecs: "hvc1.2.4.L153.B0",
+            eotf: "smpte2084",
+          },
+          { mimeType: "video/mp2t", codecs: "hvc1.1.6.L93.90" },
+        ],
+        VP8: [{ mimeType: "video/webm", codecs: "vp8" }],
+        VP9: [
+          { mimeType: "video/webm", codecs: "vp9" },
+          { mimeType: "video/webm", codecs: "vp09.00.10.08" },
+          { mimeType: "video/mp4", codecs: "vp9" },
+          { mimeType: "video/mp4", codecs: "vp09.00.10.08" },
+        ],
+        AV1: [{ mimeType: "video/mp4", codecs: "av01.0.01M.08" }],
+        AAC: [
+          { mimeType: "audio/mp4", codecs: "mp4a.40.2" }, // AAC
+          { mimeType: "video/mp2t", codecs: "mp4a.40.2" },
+        ],
+        AC3: [
+          { mimeType: "audio/mp4", codecs: "ac-3" }, // AC3
+          { mimeType: "video/mp2t", codecs: "ac-3" },
+        ],
+        "EC-3": [
+          { mimeType: "audio/mp4", codecs: "ec-3" }, // EC-3
+          { mimeType: "video/mp2t", codecs: "ec-3" },
+        ],
+        Opus: [
+          { mimeType: "audio/webm", codecs: "opus" }, // Opus
+          { mimeType: "audio/mp4", codecs: "opus" },
+        ],
+        FLAC: [
+          { mimeType: "audio/flac", codecs: "" }, // FLAC
+          { mimeType: "audio/mp4", codecs: "flac" },
+        ],
+        DTS: [
+          { mimeType: "audio/mp4", codecs: "dtsc" }, // DTS Digital Surround
+          { mimeType: "audio/mp4", codecs: "dtse" }, // DTS Express
+          { mimeType: "audio/mp4", codecs: "dtsx" }, // DTS:X
+        ],
+        WebM: [
+          { mimeType: "video/webm", codecs: "vp8" },
+          { mimeType: "video/webm", codecs: "vp9" },
+          { mimeType: "video/webm", codecs: "vp09.00.10.08" },
+          { mimeType: "audio/webm", codecs: "vorbis" },
+          { mimeType: "audio/webm", codecs: "opus" },
+        ],
+        "MPEG-2 TS": [
+          { mimeType: "video/mp2t", codecs: "avc1.42E01E" },
+          { mimeType: "video/mp2t", codecs: "avc3.42E01E" },
+          { mimeType: "video/mp2t", codecs: "hvc1.1.6.L93.90" },
+          { mimeType: "video/mp2t", codecs: "mp4a.40.2" },
+          { mimeType: "video/mp2t", codecs: "ac-3" },
+          { mimeType: "video/mp2t", codecs: "ec-3" },
+        ],
+        WebVTT: [
+          { mimeType: "text/vtt", codecs: "" }, // WebVTT
+          { mimeType: "application/mp4", codecs: "wvtt" }, // WebVTT in MP4
+        ],
+        TTML: [
+          { mimeType: "application/ttml+xml", codecs: "" }, // TTML
+          { mimeType: "application/mp4", codecs: "stpp" }, // TTML in MP4
+        ],
+      };
+
+      // Проверка поддержки MediaSource внутри воркера
+      if (window.Worker && mse.canConstructInDedicatedWorker) {
+        // Воркер скрипт
+        const workerScript = `
+                            onmessage = function(e) {
+                                const codecRepresentations = e.data;
+
+                                function getFullMimeType(mimeType, codecs, eotf) {
+                                    if (eotf) {
+                                        return mimeType + '; codecs="' + codecs + '"; eotf="' + eotf + '"';
+                                    } else {
+                                        return mimeType + '; codecs="' + codecs + '"';
+                                    }
+                                }
+
+                                function checkRepresentationSupport(representation) {
+                                    const mediaSource =  self.ManagedMediaSource || self.MediaSource || self.WebKitMediaSource;
+                                    if (!mediaSource) {
+                                        return false;
+                                    }
+                                    return mediaSource.isTypeSupported(
+                                        getFullMimeType(representation.mimeType, representation.codecs, representation.eotf)
+                                    );
+                                }
+
+                                function checkSupport() {
+                                    const result = {};
+                                    for (let category in codecRepresentations) {
+                                        result[category] = codecRepresentations[category].map(function(representation) {
+                                            return {
+                                                mimeType: representation.mimeType,
+                                                codecs: representation.codecs,
+                                                eotf: representation.eotf,
+                                                supported: checkRepresentationSupport(representation)
+                                            };
+                                        });
+                                    }
+                                    return result;
+                                }
+
+                                postMessage(checkSupport());
+                            }
+                        `;
+
+        // Создаем воркер
+        const workerBlob = new Blob([workerScript], {
+          type: "application/javascript",
+        });
+        const worker = new Worker(URL.createObjectURL(workerBlob));
+
+        worker.postMessage(codecRepresentations);
+
+        // Обрабатываем результаты от воркера
+        worker.onmessage = function (e) {
+          const results = e.data;
+          for (const category in results) {
+            results[category].forEach(function (representation) {
+              updateTable(
+                "results-worker-thread",
+                category,
+                representation,
+                representation.supported
+              );
+            });
+          }
+
+          document.getElementById("worker-support").textContent =
+            "MediaSource is supported in Worker";
+        };
+
+        worker.onerror = function () {
+          document.getElementById("worker-support").textContent =
+            "MediaSource is not supported in Worker";
+        };
+      } else {
+        document.getElementById("worker-support").textContent =
+          "Web Workers are not supported in this browser";
+      }
+
+      function getFullMimeType(mimeType, codecs, eotf = "") {
+        if (eotf) {
+          return mimeType + '; codecs="' + codecs + '"; eotf="' + eotf + '"';
+        } else {
+          return mimeType + '; codecs="' + codecs + '"';
+        }
+      }
+
+      // Функция для проверки поддержки представления
+      function checkRepresentationSupport(representation) {
+        if (!mse) {
+          return false;
+        }
+        return mse.isTypeSupported(
+          getFullMimeType(
+            representation.mimeType,
+            representation.codecs,
+            representation.eotf
+          )
+        );
+      }
+
+      // Функция для обновления таблицы (объявлена позже)
+      function updateTable(tableId, category, representation, supported) {
+        const table = document.getElementById(tableId);
+        const row = table.insertRow(-1);
+
+        const categoryCell = row.insertCell(0);
+        categoryCell.textContent = category;
+
+        const mimeTypeCell = row.insertCell(1);
+        mimeTypeCell.textContent = representation.mimeType;
+
+        const codecsCell = row.insertCell(2);
+        codecsCell.textContent = representation.codecs;
+
+        const supportedCell = row.insertCell(3);
+        supportedCell.textContent = supported ? "Yes" : "No";
+      }
+
+      // Проверка представлений в главном потоке
+      document.addEventListener("DOMContentLoaded", function () {
+        for (const category in codecRepresentations) {
+          codecRepresentations[category].forEach(function (representation) {
+            const supported = checkRepresentationSupport(representation);
+            updateTable(
+              "results-main-thread",
+              category,
+              representation,
+              supported
+            );
+          });
+        }
+      });
+
+      // Инициализация clipboard.js
+      const clipboard = new ClipboardJS(".copy-button", {
+        text: function () {
+          return generateResultsText();
+        },
+      });
+
+      // Функция для генерации текста из результатов
+      function generateResultsText() {
+        const resultsTable = document.getElementById("results-worker-thread");
+        const resultsMainTable = document.getElementById("results-main-thread");
+        const workerSupport =
+          document.getElementById("worker-support").textContent;
+
+        let text = `Worker Support: ${workerSupport}\n`;
+
+        // Добавление заголовков для таблиц
+        text += "Results from Worker\n";
+        for (let row of resultsTable.rows) {
+          for (let cell of row.cells) {
+            text += cell.textContent + "\t";
+          }
+          text += "\n";
+        }
+
+        text += "Results from Main Thread\n";
+        for (let row of resultsMainTable.rows) {
+          for (let cell of row.cells) {
+            text += cell.textContent + "\t";
+          }
+          text += "\n";
+        }
+
+        return text;
+      }
+
+      document
+        .querySelector(".apply-button")
+        .addEventListener("click", function () {
+          const inputResults = document.getElementById("input-results").value;
+          const sections = inputResults.split("\nResults from ");
+
+          const resultsData = {
+            Worker: [],
+            "Main Thread": [],
+          };
+
+          sections.forEach(function (section) {
+            const lines = section
+              .split("\n")
+              .filter((line) => line.trim() !== "");
+            if (lines.length > 0) {
+              if (lines[0].startsWith("Worker Support")) {
+                const workerSupport = lines[0].split("Worker Support: ")[1];
+                document.getElementById("worker-support").textContent =
+                  workerSupport;
+              } else {
+                const category = lines[0].match(/Worker|Main Thread/)[0];
+                lines.slice(1).forEach(function (line) {
+                  const cells = line.split("\t");
+                  cells.length = 4;
+                  const entry = {
+                    category: cells[0],
+                    mimeType: cells[1],
+                    codecs: cells[2],
+                    supported: cells[3] === "Yes",
+                  };
+                  if (entry.category in codecRepresentations) {
+                    resultsData[category].push(entry);
+                  }
+                });
+              }
+            }
+          });
+
+          ["Worker", "Main Thread"].forEach(function (category) {
+            const tableId =
+              category === "Worker"
+                ? "results-worker-thread"
+                : "results-main-thread";
+            const table = document.getElementById(tableId);
+            // Очистка текущих результатов
+            while (table.rows.length > 1) {
+              table.deleteRow(1);
+            }
+            // Заполнение новыми результатами
+            resultsData[category].forEach(function (entry) {
+              updateTable(tableId, entry.category, entry, entry.supported);
+            });
+          });
+        });
+    </script>
+  </body>
+</html>
